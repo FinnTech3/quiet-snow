@@ -1,0 +1,35 @@
+#include <windows.h>
+#include "version.h"
+
+1 ICON "QuietSnow.ico"
+1 RT_MANIFEST "QuietSnow.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION QS_VERSION_NUM
+ PRODUCTVERSION QS_VERSION_NUM
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080904b0"
+        BEGIN
+            VALUE "CompanyName", "FinnTech3"
+            VALUE "FileDescription", "Quiet Snow: snow overlay for the desktop"
+            VALUE "FileVersion", QS_VERSION_STR
+            VALUE "InternalName", "QuietSnow"
+            VALUE "LegalCopyright", "Copyright (c) FinnTech3. MIT licence."
+            VALUE "OriginalFilename", "QuietSnow.exe"
+            VALUE "ProductName", "Quiet Snow"
+            VALUE "ProductVersion", QS_VERSION_STR
+            VALUE "Comments", "Source: https://github.com/FinnTech3/quiet-snow"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x809, 1200
+    END
+END
