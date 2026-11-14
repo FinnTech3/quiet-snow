@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiet Snow</title>
+<meta name="description" content="Free snow for your Mac or Windows desktop. It settles on your windows, slides off when you drag them, and stays out of your way.">
+<meta property="og:title" content="Quiet Snow">
+<meta property="og:description" content="Free snow for your Mac or Windows desktop. About 28 to 44 MB of memory, no account, no network.">
+<meta property="og:image" content="https://raw.githubusercontent.com/FinnTech3/quiet-snow/main/docs/social-preview.png">
+<style>
+:root { --bg:#f6f9fd; --ink:#14202e; --soft:#4a5b6e; --card:#ffffff; --line:#d9e3ef; --accent:#2f6fd6; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0e1621; --ink:#e8eef6; --soft:#9fb1c5; --card:#16222f; --line:#263649; --accent:#6aa3ff; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 48px 16px 64px; }
+h1 { font-size: 2.4rem; margin: 0 0 8px; letter-spacing: -0.02em; }
+h2 { font-size: 1.25rem; margin: 40px 0 8px; }
+p { margin: 0 0 12px; }
+.lead { font-size: 1.15rem; color: var(--soft); }
+.buttons { display:flex; flex-wrap:wrap; gap:12px; margin: 24px 0; }
+.buttons a { background: var(--accent); color:#fff; text-decoration:none; padding: 12px 20px; border-radius: 10px; font-weight:600; }
+.buttons a.alt { background: transparent; color: var(--accent); border: 2px solid var(--accent); }
+img { max-width:100%; height:auto; border-radius: 10px; border: 1px solid var(--line); }
+.two { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } h1 { font-size: 2rem; } }
+table { width:100%; border-collapse: collapse; background: var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+th, td { text-align:left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+code { background: var(--card); border:1px solid var(--line); border-radius:6px; padding: 1px 6px; font-size: .92em; }
+pre { background: var(--card); border:1px solid var(--line); border-radius:10px; padding: 12px; overflow-x:auto; }
+footer { color: var(--soft); font-size: .95rem; margin-top: 48px; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Quiet Snow</h1>
+  <p class="lead">Free snow for your Mac or Windows desktop. It settles on your windows, slides off when you drag them, and stays out of your way.</p>
+  <div class="buttons">
+    <a href="https://github.com/FinnTech3/quiet-snow/releases/latest/download/QuietSnow.zip">Download for Mac</a>
+    <a href="https://github.com/FinnTech3/quiet-snow/releases/latest/download/QuietSnow-Windows.zip">Download for Windows</a>
+    <a class="alt" href="https://github.com/FinnTech3/quiet-snow">Source on GitHub</a>
+  </div>
+  <img src="https://raw.githubusercontent.com/FinnTech3/quiet-snow/assets/demo.gif" alt="A drawn desktop with two windows. The cursor sweeps a pile of snow off the top of one window, then the other window is dragged and its snow drops.">
+
+  <h2>The numbers</h2>
+  <table>
+    <tr><th>Price</th><td>Free. MIT licence.</td></tr>
+    <tr><th>Memory</th><td>About 44 MB on a Mac, 28 MB on Windows.</td></tr>
+    <tr><th>CPU</th><td>5 to 8% of one core in CI, on virtual machines. It stops completely when the screen sleeps or locks.</td></tr>
+    <tr><th>Network</th><td>None. No account, no tracking. The Windows program does not link the networking libraries at all.</td></tr>
+    <tr><th>Needs</th><td>macOS 13 or later, or Windows 10 version 2004 or later.</td></tr>
+  </table>
+
+  <h2>What it does</h2>
+  <p>Snow falls, lies along the tops of your windows and the Dock or taskbar, slides off when you move a window, and flies when you sweep the cursor through a pile. Snowmen build themselves on deep snow and fall apart into snowballs when you move the window; a little plough clears the bottom of the screen now and then. Six snow types: balls, snowflakes, sleet, sparkles, hail, or a mix. Desktop only mode keeps it behind your apps and hides it completely on a display where an app is full screen.</p>
+  <div class="two">
+    <img src="https://raw.githubusercontent.com/FinnTech3/quiet-snow/assets/snapshot.png" alt="Mac build: snow piled on two window tops and along the Dock edge">
+    <img src="https://raw.githubusercontent.com/FinnTech3/quiet-snow/assets/windows-snapshot.png" alt="Windows build: the same scene rendered by the Direct3D build">
+  </div>
+
+  <h2>Install</h2>
+  <p>Windows: unzip, double-click <code>QuietSnow.exe</code>. Or with Scoop:</p>
+  <pre>scoop bucket add finntech3 https://github.com/FinnTech3/quiet-snow
+scoop install quiet-snow</pre>
+  <p>Mac: unzip, open <code>QuietSnow.app</code>. Or in Terminal:</p>
+  <pre>curl -fsSL https://raw.githubusercontent.com/FinnTech3/quiet-snow/main/install.sh | sh</pre>
+
+  <h2>The honest bit</h2>
+  <p>It is not code signed yet, so Windows SmartScreen or macOS may warn you. Every Windows release carries a SHA256 file and a build attestation, and the source is public. CI builds and tests both apps and renders real frames, but I have not watched it on a real desktop, and the page on GitHub says exactly what is and is not proven.</p>
+
+  <footer>Built by FinnTech3. <a href="https://github.com/FinnTech3/quiet-snow/issues">Tell me what you see</a>.</footer>
+</main>
+</body>
+</html>

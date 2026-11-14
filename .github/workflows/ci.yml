@@ -1,0 +1,199 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, for example v1.0.0 (leave empty for a plain build)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test -c release -Xswiftc -enable-testing | tee swift.txt
+      - name: The Windows model and the Mac model must agree
+        run: |
+          clang++ -std=c++17 -O2 windows/tests.cpp -o cpp-tests
+          ./cpp-tests | tee cpp.txt
+          apt-get update -qq && apt-get install -y -qq python3 > /dev/null
+          python3 tools/golden_compare.py cpp.txt swift.txt
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        run: swift test -c release -Xswiftc -enable-testing
+      - name: Build universal app
+        run: ./build.sh
+      - name: Check the binary
+        run: |
+          lipo -archs build/QuietSnow.app/Contents/MacOS/QuietSnow
+          codesign --verify --verbose build/QuietSnow.app
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --version
+      - name: Render a snapshot and a clip with the real shaders
+        continue-on-error: true
+        run: |
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --snapshot snapshot.png
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --snapshot mix.png --mix
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --frames frames
+          brew install ffmpeg
+          ffmpeg -loglevel error -framerate 60 -i frames/f%04d.png -c:v libx264 -pix_fmt yuv420p -crf 20 demo.mp4
+          ffmpeg -loglevel error -framerate 60 -i frames/f%04d.png \
+            -vf "fps=20,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" demo.gif
+          ls -l snapshot.png mix.png demo.mp4 demo.gif
+      - name: Measure memory and CPU while running
+        continue-on-error: true
+        run: |
+          SAMPLE_OUT=sample.txt tools/measure.sh | tee measure.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quiet-snow
+          path: |
+            build/QuietSnow.zip
+            snapshot.png
+            mix.png
+            demo.gif
+            demo.mp4
+            measure.txt
+            sample.txt
+          if-no-files-found: warn
+
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Model tests
+        run: |
+          cl /nologo /std:c++17 /O2 /EHsc windows\tests.cpp /Fe:tests.exe
+          .\tests.exe
+      - name: Build
+        run: |
+          rc /nologo /fo QuietSnow.res windows\QuietSnow.rc
+          cl /nologo /std:c++17 /O2 /GL /EHsc /MT /guard:cf /DUNICODE /D_UNICODE windows\main.cpp /Fe:QuietSnow.exe /link /SUBSYSTEM:WINDOWS /LTCG /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /GUARD:CF QuietSnow.res
+          Get-Item QuietSnow.exe | Format-List Name, Length
+          (Get-Item QuietSnow.exe).VersionInfo | Format-List CompanyName, FileDescription, FileVersion, ProductName, OriginalFilename, LegalCopyright
+          .\QuietSnow.exe --version | Write-Output
+      - name: Render a snapshot with the real shaders
+        run: |
+          .\QuietSnow.exe --snapshot windows-snapshot.bmp | Write-Output
+          Add-Type -AssemblyName System.Drawing
+          $img = [System.Drawing.Image]::FromFile((Resolve-Path windows-snapshot.bmp))
+          $img.Save("$PWD\windows-snapshot.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $img.Dispose()
+          Get-Item windows-snapshot.png | Format-List Name, Length
+          .\QuietSnow.exe --snapshot windows-mix.bmp --mix | Write-Output
+          $img = [System.Drawing.Image]::FromFile((Resolve-Path windows-mix.bmp))
+          $img.Save("$PWD\windows-mix.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $img.Dispose()
+      - name: Measure memory and CPU while running
+        continue-on-error: true
+        run: |
+          .\tools\measure.ps1 | Tee-Object -FilePath windows-measure.txt
+      - name: Check what it puts on the desktop
+        run: |
+          $out = & .\tools\smoke.ps1
+          $out | Tee-Object -FilePath windows-smoke.txt
+          if ($out -notcontains "all checks passed") { throw "smoke checks failed" }
+      - name: Scan with Microsoft Defender
+        run: |
+          $mp = "$env:ProgramFiles\Windows Defender\MpCmdRun.exe"
+          if (-not (Test-Path $mp)) { $mp = (Get-ChildItem "$env:ProgramData\Microsoft\Windows Defender\Platform\*\MpCmdRun.exe" | Sort-Object FullName | Select-Object -Last 1).FullName }
+          "Scanner: $mp" | Tee-Object -FilePath defender-scan.txt
+          & $mp -SignatureUpdate 2>&1 | Out-Null
+          & $mp -GetFiles 2>&1 | Out-Null
+          $out = & $mp -Scan -ScanType 3 -File "$PWD\QuietSnow.exe" -DisableRemediation 2>&1
+          $code = $LASTEXITCODE
+          $out | Tee-Object -FilePath defender-scan.txt -Append
+          "exit code: $code (0 = no threat found, 2 = threat found)" | Tee-Object -FilePath defender-scan.txt -Append
+          if ($code -eq 2) { throw "Microsoft Defender flagged QuietSnow.exe" }
+      - name: Package
+        run: |
+          New-Item -ItemType Directory -Path pkg | Out-Null
+          Copy-Item QuietSnow.exe, LICENSE, windows\README.txt pkg\
+          Compress-Archive -Path pkg\* -DestinationPath QuietSnow-Windows.zip
+          $exe = (Get-FileHash QuietSnow.exe -Algorithm SHA256).Hash.ToLower()
+          $zip = (Get-FileHash QuietSnow-Windows.zip -Algorithm SHA256).Hash.ToLower()
+          "$exe  QuietSnow.exe`n$zip  QuietSnow-Windows.zip" | Set-Content -Encoding ascii SHA256SUMS-Windows.txt
+          Get-Content SHA256SUMS-Windows.txt
+      - name: Attest build provenance
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: QuietSnow-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quiet-snow-windows
+          path: |
+            QuietSnow-Windows.zip
+            SHA256SUMS-Windows.txt
+            defender-scan.txt
+            windows-smoke.txt
+            windows-snapshot.png
+            windows-mix.png
+            windows-measure.txt
+          if-no-files-found: warn
+
+  publish:
+    needs: [mac, windows]
+    if: github.ref == 'refs/heads/main' && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+        continue-on-error: true
+      - name: Publish media to the assets branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir /tmp/assets
+          find art -type f \( -name '*.png' -o -name '*.gif' -o -name '*.mp4' -o -name '*.txt' \) -exec cp {} /tmp/assets/ \;
+          ls -l /tmp/assets
+          cd /tmp/assets
+          git init -q -b assets
+          git config user.name FinnTech3
+          git config user.email 72574388+FinnTech3@users.noreply.github.com
+          git add -A
+          git commit -q -m "Media from CI"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" assets
+
+  release:
+    needs: [mac, windows]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          find art -type f
+          mac=$(find art -name QuietSnow.zip | head -n 1)
+          win=$(find art -name QuietSnow-Windows.zip | head -n 1)
+          sums=$(find art -name SHA256SUMS-Windows.txt | head -n 1)
+          test -n "$mac" && test -n "$win" && test -n "$sums"
+          gh release create "$TAG" "$mac" "$win" "$sums" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Quiet Snow ${TAG#v}" \
+            --notes "Mac: download QuietSnow.zip, unzip it and open QuietSnow.app (or run the one-line install in the README). Windows: download QuietSnow-Windows.zip, unzip it and run QuietSnow.exe. SHA256 sums for the Windows files are in SHA256SUMS-Windows.txt. Everything is built by the CI run that made this release, from the source at this tag."
