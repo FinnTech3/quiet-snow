@@ -1,0 +1,148 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, for example v1.0.0 (leave empty for a plain build)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test -c release -Xswiftc -enable-testing
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        run: swift test -c release -Xswiftc -enable-testing
+      - name: Build universal app
+        run: ./build.sh
+      - name: Check the binary
+        run: |
+          lipo -archs build/QuietSnow.app/Contents/MacOS/QuietSnow
+          codesign --verify --verbose build/QuietSnow.app
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --version
+      - name: Render a snapshot and a clip with the real shaders
+        continue-on-error: true
+        run: |
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --snapshot snapshot.png
+          build/QuietSnow.app/Contents/MacOS/QuietSnow --frames frames
+          brew install ffmpeg
+          ffmpeg -loglevel error -framerate 60 -i frames/f%04d.png -c:v libx264 -pix_fmt yuv420p -crf 20 demo.mp4
+          ffmpeg -loglevel error -framerate 60 -i frames/f%04d.png \
+            -vf "fps=20,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=5" demo.gif
+          ls -l snapshot.png demo.mp4 demo.gif
+      - name: Measure memory and CPU while running
+        continue-on-error: true
+        run: |
+          SAMPLE_OUT=sample.txt tools/measure.sh | tee measure.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quiet-snow
+          path: |
+            build/QuietSnow.zip
+            snapshot.png
+            demo.gif
+            demo.mp4
+            measure.txt
+            sample.txt
+          if-no-files-found: warn
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Model tests
+        run: |
+          cl /nologo /std:c++17 /O2 /EHsc windows\tests.cpp /Fe:tests.exe
+          .\tests.exe
+      - name: Build
+        run: |
+          cl /nologo /std:c++17 /O2 /GL /EHsc /MT /DUNICODE /D_UNICODE windows\main.cpp /Fe:QuietSnow.exe /link /SUBSYSTEM:WINDOWS /LTCG
+          Get-Item QuietSnow.exe | Format-List Name, Length
+          .\QuietSnow.exe --version | Write-Output
+      - name: Render a snapshot with the real shaders
+        continue-on-error: true
+        run: |
+          .\QuietSnow.exe --snapshot windows-snapshot.bmp | Write-Output
+          Add-Type -AssemblyName System.Drawing
+          $img = [System.Drawing.Image]::FromFile((Resolve-Path windows-snapshot.bmp))
+          $img.Save("$PWD\windows-snapshot.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $img.Dispose()
+          Get-Item windows-snapshot.png | Format-List Name, Length
+      - name: Measure memory and CPU while running
+        continue-on-error: true
+        run: |
+          .\tools\measure.ps1 | Tee-Object -FilePath windows-measure.txt
+      - name: Package
+        run: Compress-Archive -Path QuietSnow.exe -DestinationPath QuietSnow-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quiet-snow-windows
+          path: |
+            QuietSnow-Windows.zip
+            windows-snapshot.png
+            windows-measure.txt
+          if-no-files-found: warn
+
+  publish:
+    needs: [mac, windows]
+    if: github.ref == 'refs/heads/main' && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+        continue-on-error: true
+      - name: Publish media to the assets branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir /tmp/assets
+          find art -type f \( -name '*.png' -o -name '*.gif' -o -name '*.mp4' -o -name '*.txt' \) -exec cp {} /tmp/assets/ \;
+          ls -l /tmp/assets
+          cd /tmp/assets
+          git init -q -b assets
+          git config user.name FinnTech3
+          git config user.email 72574388+FinnTech3@users.noreply.github.com
+          git add -A
+          git commit -q -m "Media from CI"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" assets
+
+  release:
+    needs: [mac, windows]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          find art -type f
+          mac=$(find art -name QuietSnow.zip | head -n 1)
+          win=$(find art -name QuietSnow-Windows.zip | head -n 1)
+          test -n "$mac" && test -n "$win"
+          gh release create "$TAG" "$mac" "$win" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Quiet Snow ${TAG#v}" \
+            --notes "Mac: curl -fsSL https://raw.githubusercontent.com/FinnTech3/quiet-snow/main/install.sh | sh. Windows: irm https://raw.githubusercontent.com/FinnTech3/quiet-snow/main/install.ps1 | iex"
