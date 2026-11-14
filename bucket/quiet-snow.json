@@ -1,0 +1,17 @@
+{
+    "version": "1.3.0",
+    "description": "Free snow for your desktop. It settles on your windows, slides off when you drag them, and stays out of your way.",
+    "homepage": "https://github.com/FinnTech3/quiet-snow",
+    "license": "MIT",
+    "url": "https://github.com/FinnTech3/quiet-snow/releases/download/v1.3.0/QuietSnow-Windows.zip",
+    "hash": "4cfbe76ae42cfa73f121d48aa72aea39078f06f9653889b8aa42c5bba8b92d1f",
+    "shortcuts": [["QuietSnow.exe", "Quiet Snow"]],
+    "checkver": "github",
+    "autoupdate": {
+        "url": "https://github.com/FinnTech3/quiet-snow/releases/download/v$version/QuietSnow-Windows.zip",
+        "hash": {
+            "url": "https://github.com/FinnTech3/quiet-snow/releases/download/v$version/SHA256SUMS-Windows.txt",
+            "regex": "$sha256\\s+QuietSnow-Windows.zip"
+        }
+    }
+}
