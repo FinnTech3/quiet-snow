@@ -1,0 +1,31 @@
+ok    still running after 5 seconds
+ok    an overlay window exists (1 found)
+ok    overlay is visible
+ok    overlay is click-through (WS_EX_TRANSPARENT)
+ok    overlay is layered
+ok    overlay is topmost
+ok    overlay never takes focus (WS_EX_NOACTIVATE)
+ok    overlay stays out of Alt-Tab and the taskbar (WS_EX_TOOLWINDOW)
+ok    overlay covers the display (1024 x 768)
+ok    overlay is exactly the size and place of the primary display
+      message-only windows on this desktop: 79; lookup said: error 0
+ok    tray host window exists
+ok    overlay stayed visible for 12 seconds (0 gaps in 24 samples)
+ok    still running after 17 seconds
+ok    a second copy exits at once (single instance)
+ok    a close request ends the process cleanly
+ok    desktop-only mode runs
+ok    desktop-only mode shows its overlay
+ok    snow type 0 runs
+ok    snow type 1 runs
+ok    snow type 2 runs
+ok    snow type 3 runs
+ok    snow type 4 runs
+ok    snow type 5 runs
+ok    desktop-only mode shows snow with nothing full screen
+ok    desktop-only mode hides the snow while an app is full screen
+ok    desktop-only mode shows snow again when the full screen app closes
+ok    over-all mode shows snow with nothing full screen
+ok    over-all mode keeps the snow over a full screen app
+ok    over-all mode shows snow again when the full screen app closes
+all checks passed

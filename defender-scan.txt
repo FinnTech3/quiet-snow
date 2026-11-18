@@ -1,0 +1,5 @@
+Scanner: C:\Program Files\Windows Defender\MpCmdRun.exe
+Scan starting...
+Scan finished.
+Scanning D:\a\quiet-snow\quiet-snow\QuietSnow.exe found no threats.
+exit code: 0 (0 = no threat found, 2 = threat found)
